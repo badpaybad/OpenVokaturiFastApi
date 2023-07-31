@@ -23,9 +23,12 @@ import sys
 import threading
 import re
 
+from typing import Optional
 import sys
 import scipy.io.wavfile
 
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 _http_port = str(sys.argv[1])
 
@@ -137,7 +140,7 @@ def extractEmotionFromAudioBytes(audioBytes):
     return extractEmotionFromAudioNdarray(sample_rate, samples)
 
 
-def extractEmotionFromAudioNdarray(sample_rate: int, samplesNdarray):
+def extractEmotionFromAudioNdarray(sample_rate: float, samplesNdarray):
 
     print("   sample rate %.3f Hz" % sample_rate)
     print("Allocating Vokaturi sample array...")
@@ -170,25 +173,111 @@ def extractEmotionFromAudioNdarray(sample_rate: int, samplesNdarray):
     }
 
     if quality.valid:
-        print("Neutral: %.3f" % emotionProbabilities.neutrality)
-        print("Happy: %.3f" % emotionProbabilities.happiness)
-        print("Sad: %.3f" % emotionProbabilities.sadness)
-        print("Angry: %.3f" % emotionProbabilities.anger)
-        print("Fear: %.3f" % emotionProbabilities.fear)
+        # print("Neutral: %.3f" % emotionProbabilities.neutrality)
+        # print("Happy: %.3f" % emotionProbabilities.happiness)
+        # print("Sad: %.3f" % emotionProbabilities.sadness)
+        # print("Angry: %.3f" % emotionProbabilities.anger)
+        # print("Fear: %.3f" % emotionProbabilities.fear)
         temp = {
-            "neutral": emotionProbabilities.neutrality,
-            "happy": emotionProbabilities.happiness,
-            "sad": emotionProbabilities.sadness,
-            "angry": emotionProbabilities.anger,
-            "fear": emotionProbabilities.fear
+           
+                "neutral":round ( emotionProbabilities.neutrality,3),
+                "happy": round(emotionProbabilities.happiness,3),
+                "sad": round(emotionProbabilities.sadness,3),
+                "angry": round( emotionProbabilities.anger,3),
+                "fear": round( emotionProbabilities.fear,3)
         }
     else:
         print("Not enough sonorancy to determine emotions")
 
     voice.destroy()
 
-    return temp
+    return (temp, sample_rate,samplesNdarray)
 
+def extractEmotionFromAudioNdarrayInterval(sample_rate: float, samplesNdarray, timeStep:float=2):
+    
+    print("   sample rate %.3f Hz" % sample_rate)
+    print("Allocating Vokaturi sample array...")
+    numberOfSamples = len(samplesNdarray)
+    print("   %d samples, %d channels" % (numberOfSamples, samplesNdarray.ndim))
+    duration = numberOfSamples / sample_rate
+        
+    bufferSafetyTime = 1.0
+    bufferDuration = timeStep + bufferSafetyTime
+    bufferLength = int(sample_rate * bufferDuration)
+    if(bufferLength> numberOfSamples):
+        bufferLength= numberOfSamples
+        
+    numberOfSteps = int(duration / timeStep )
+    if numberOfSteps<=0:
+        numberOfSteps=1
+    
+    print(f"duration: {duration}; numberOfSteps: {numberOfSteps}; bufferLength: {bufferLength}")
+    
+    voice = Vokaturi.Voice (  sample_rate, bufferLength, 0  )
+    
+    dicResult=[]
+    
+    for istep in range(0,numberOfSteps):        
+        startingTime = istep * timeStep
+        startingSample =int( startingTime * sample_rate)
+        
+        nstep=istep+1
+        endTime = nstep * timeStep       
+        if istep== numberOfSteps-1:
+            endTime= duration        
+        endSample =int( endTime * sample_rate )     
+        if (endSample > numberOfSamples):
+            endSample = numberOfSamples
+        
+        #print(f"startingTime -> endTime: {startingTime} -> {endTime} at istep: {istep}/{numberOfSteps}")
+        #print(f"startingSample -> endSample: {startingSample} -> {endSample} at istep: {istep}/{numberOfSamples}")
+        c_buffer = Vokaturi.float64array(int(endSample-startingSample))
+        if samplesNdarray.ndim == 1:
+            c_buffer[:] = samplesNdarray[startingSample:endSample] / 32768.0  # mono
+        else:
+            c_buffer[:] = 0.5*(samplesNdarray[startingSample:endSample, 0]+0.0 +
+                            samplesNdarray[startingSample:endSample, 1]) / 32768.0  # stereo
+            
+        
+        voice.fill_float64array( int(endSample-startingSample)   , c_buffer)
+        
+        quality = Vokaturi.Quality()
+        emotionProbabilities = Vokaturi.EmotionProbabilities()
+        voice.extract(quality, emotionProbabilities)
+        temp = {
+                "neutral": None,
+                "happy": None,
+                "sad": None,
+                "angry": None,
+                "fear": None
+            }
+
+        if quality.valid:
+            # print("Neutral: %.3f" % emotionProbabilities.neutrality)
+            # print("Happy: %.3f" % emotionProbabilities.happiness)
+            # print("Sad: %.3f" % emotionProbabilities.sadness)
+            # print("Angry: %.3f" % emotionProbabilities.anger)
+            # print("Fear: %.3f" % emotionProbabilities.fear)
+            temp = {
+                "neutral":round ( emotionProbabilities.neutrality,3),
+                "happy": round(emotionProbabilities.happiness,3),
+                "sad": round(emotionProbabilities.sadness,3),
+                "angry": round( emotionProbabilities.anger,3),
+                "fear": round( emotionProbabilities.fear,3)
+            }
+        else:
+            print("Not enough sonorancy to determine emotions")
+            
+        dicResult.append (
+            {
+            "startingTime":startingTime,
+            "endTime":endTime,
+            "data":temp
+        }
+        )
+    voice.destroy()
+    return (dicResult, sample_rate, samplesNdarray)
+    pass
 
 webApp = FastAPI()
 
@@ -260,7 +349,7 @@ async def root():
 
 
 @webApp.post("/apis/audio/detect/emotion")
-async def audioDetectEmotion(file: UploadFile = File(...)):
+async def audioDetectEmotion(file: UploadFile = File(...), stepInSeconds:Optional[int]=2):
     speechBytes = await file.read()
     
     speechBytes= convertToWavFromBytes(speechBytes,file.filename)
@@ -276,10 +365,18 @@ async def audioDetectEmotion(file: UploadFile = File(...)):
 
     # audiobytes = audio_file_object.getvalue()
     # numpyData = numpy.frombuffer(audiobytes)
+    full,sample_rate, samples= extractEmotionFromAudioBytes(speechBytes)
+    chunks=[]
+    if stepInSeconds==None or stepInSeconds<=0:
+        pass
+    else:
+        chunks, sample_rate,samples = extractEmotionFromAudioNdarrayInterval(sample_rate, samples,stepInSeconds)
+        pass
     
     return {
         "ok": 1,
-        "data": extractEmotionFromAudioBytes(speechBytes)
+        "full":full,
+        "chunks": chunks
     }
 
 
@@ -291,8 +388,14 @@ def runUvicorn(port):
 # file_name = f"{____workingDir}/E_anhbd6_D_2023-01-04_H_085448_331_CLID_0971129816_210_21_NO.wav"
 # file_name = f"{____workingDir}/2023-01-11-2022-0338954101-14.41.mp3"
 file_name = f"{____workingDir}/oh-yeah-everything-is-fine.wav"
+#file_name=f"{____workingDir}/1690830159.054426.e1c9f763-7b55-44ba-b609-15d7cbd42c85.2023-01-11-2022-0338954101-14.41.mp3.wav"
 
-extractEmotionFromAudioFile(file_name)
+full= extractEmotionFromAudioFile(file_name)
+print(full)
+(sample_rate, samples) = scipy.io.wavfile.read(file_name)
+dicres= extractEmotionFromAudioNdarrayInterval(sample_rate, samples, 30)
+
+print(dicres)
 
 if __name__ == "__main__":    
     runUvicorn(_http_port)
