@@ -350,34 +350,42 @@ async def root():
 
 @webApp.post("/apis/audio/detect/emotion")
 async def audioDetectEmotion(file: UploadFile = File(...), stepInSeconds:Optional[int]=2):
-    speechBytes = await file.read()
-    
-    speechBytes= convertToWavFromBytes(speechBytes,file.filename)
-    
-    # audio_file_object = io.BytesIO()
-    # sampleRate = 16000
-    # with wave.open(audio_file_object, 'wb') as mem_file:
-    #     mem_file.setnchannels(1)  # Mono audio
-    #     mem_file.setsampwidth(2)  # 16-bit audio
-    #     mem_file.setframerate(sampleRate)  # Sample rate
-    #     mem_file.writeframes(speechBytes)
-    # audio_file_object.seek(0)
+    try:
+        speechBytes = await file.read()
+        
+        speechBytes= convertToWavFromBytes(speechBytes,file.filename)
+        
+        # audio_file_object = io.BytesIO()
+        # sampleRate = 16000
+        # with wave.open(audio_file_object, 'wb') as mem_file:
+        #     mem_file.setnchannels(1)  # Mono audio
+        #     mem_file.setsampwidth(2)  # 16-bit audio
+        #     mem_file.setframerate(sampleRate)  # Sample rate
+        #     mem_file.writeframes(speechBytes)
+        # audio_file_object.seek(0)
 
-    # audiobytes = audio_file_object.getvalue()
-    # numpyData = numpy.frombuffer(audiobytes)
-    full,sample_rate, samples= extractEmotionFromAudioBytes(speechBytes)
-    chunks=[]
-    if stepInSeconds==None or stepInSeconds<=0:
-        pass
-    else:
-        chunks, sample_rate,samples = extractEmotionFromAudioNdarrayInterval(sample_rate, samples,stepInSeconds)
-        pass
-    
-    return {
-        "ok": 1,
-        "full":full,
-        "chunks": chunks
-    }
+        # audiobytes = audio_file_object.getvalue()
+        # numpyData = numpy.frombuffer(audiobytes)
+        full,sample_rate, samples= extractEmotionFromAudioBytes(speechBytes)
+        chunks=[]
+        if stepInSeconds==None or stepInSeconds<=0:
+            pass
+        else:
+            chunks, sample_rate,samples = extractEmotionFromAudioNdarrayInterval(sample_rate, samples,stepInSeconds)
+            pass
+        
+        return {
+            "ok": 1,
+            "full":full,
+            "chunks": chunks
+        }
+    except Exception as ex:
+        print(f"audioDetectEmotion#ERR: {ex}")
+        return {
+            "ok": 0,
+            "full":None,
+            "chunks": None
+        }
 
 
 def runUvicorn(port):
