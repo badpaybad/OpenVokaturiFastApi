@@ -15,7 +15,7 @@ import uvicorn
 from jwcrypto import jwt, jwk
 import struct
 import platform
-import Vokaturi
+
 import os
 import datetime
 import math
@@ -60,6 +60,7 @@ sys.path.append(os.path.abspath(
     f"{____workingDir}/OpenVokaturi-4-0/OpenVokaturi-4-0/"))
 sys.path.append(os.path.abspath(
     f"{____workingDir}/OpenVokaturi-4-0/OpenVokaturi-4-0/api/"))
+import Vokaturi
 
 
 print("Loading library...")
@@ -85,6 +86,12 @@ print("Analyzed by: %s" % Vokaturi.versionAndLicense())
 def extractEmotionFromAudioFile(file_name: str):
 
     (sample_rate, samples) = scipy.io.wavfile.read(file_name)
+
+    return extractEmotionFromAudioNdarray(sample_rate, samples)
+
+def extractEmotionFromAudioBytes(audioBytes):
+
+    (sample_rate, samples) = scipy.io.wavfile.read(io.BytesIO(audioBytes))
 
     return extractEmotionFromAudioNdarray(sample_rate, samples)
 
@@ -129,10 +136,10 @@ def extractEmotionFromAudioNdarray(sample_rate: int, samplesNdarray):
         print("Fear: %.3f" % emotionProbabilities.fear)
         temp = {
             "neutral": emotionProbabilities.neutrality,
-            "happy": emotionProbabilities.neutrality,
-            "sad": emotionProbabilities.neutrality,
-            "angry": emotionProbabilities.neutrality,
-            "fear": emotionProbabilities.neutrality
+            "happy": emotionProbabilities.happiness,
+            "sad": emotionProbabilities.sadness,
+            "angry": emotionProbabilities.anger,
+            "fear": emotionProbabilities.fear
         }
     else:
         print("Not enough sonorancy to determine emotions")
@@ -169,35 +176,34 @@ async def root():
 @webApp.post("/apis/audio/detect/emotion")
 async def audioDetectEmotion(file: UploadFile = File(...)):
     speechBytes = await file.read()
-    audio_file_object = io.BytesIO()
-    sampleRate = 16000
-    with wave.open(audio_file_object, 'wb') as mem_file:
-        mem_file.setnchannels(1)  # Mono audio
-        mem_file.setsampwidth(2)  # 16-bit audio
-        mem_file.setframerate(sampleRate)  # Sample rate
-        mem_file.writeframes(speechBytes)
-    audio_file_object.seek(0)
+    # audio_file_object = io.BytesIO()
+    # sampleRate = 16000
+    # with wave.open(audio_file_object, 'wb') as mem_file:
+    #     mem_file.setnchannels(1)  # Mono audio
+    #     mem_file.setsampwidth(2)  # 16-bit audio
+    #     mem_file.setframerate(sampleRate)  # Sample rate
+    #     mem_file.writeframes(speechBytes)
+    # audio_file_object.seek(0)
 
-    audiobytes = audio_file_object.getvalue()
-    numpyData = numpy.frombuffer(audiobytes)
-
+    # audiobytes = audio_file_object.getvalue()
+    # numpyData = numpy.frombuffer(audiobytes)
+    
     return {
         "ok": 1,
-        "data": extractEmotionFromAudioNdarray(sampleRate, numpyData)
+        "data": extractEmotionFromAudioBytes(speechBytes)
     }
 
 
 def runUvicorn(port):
     uvicorn.run(webApp, host="0.0.0.0", port=int(port), log_level="info")
 
+# print("Reading sound file...")
 
-print("Reading sound file...")
+# file_name = f"{____workingDir}/E_anhbd6_D_2023-01-04_H_085448_331_CLID_0971129816_210_21_NO.wav"
+# file_name = f"{____workingDir}/2023-01-11-2022-0338954101-14.41.mp3"
+# file_name = f"{____workingDir}/oh-yeah-everything-is-fine.wav"
 
-file_name = f"{____workingDir}/E_anhbd6_D_2023-01-04_H_085448_331_CLID_0971129816_210_21_NO.wav"
-file_name = f"{____workingDir}/2023-01-11-2022-0338954101-14.41.mp3"
-file_name = f"{____workingDir}/oh-yeah-everything-is-fine.wav"
-
-extractEmotionFromAudioFile(file_name)
+# extractEmotionFromAudioFile(file_name)
 
 if __name__ == "__main__":
     # _port=9981
