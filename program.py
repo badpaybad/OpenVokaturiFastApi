@@ -27,6 +27,8 @@ import sys
 import scipy.io.wavfile
 
 
+_http_port = str(sys.argv[1])
+
 # insert at 1, 0 is the script path (or '' in REPL)
 ____workingDir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(1, ____workingDir)
@@ -82,16 +84,55 @@ elif platform.system() == "Linux":
         f"{____workingDir}/OpenVokaturi-4-0/OpenVokaturi-4-0/lib/open/linux/OpenVokaturi-4-0-linux.so"))
 print("Analyzed by: %s" % Vokaturi.versionAndLicense())
 
+import uuid
+import subprocess
+def convertToWavFromBytes(audioBytes, fileNameInput:str):
+    
+    fileExt=fileNameInput.split(".")[-1]+""
+    
+    print(f"fileExt: {fileExt} fileNameInput: {fileNameInput}")
+    
+    # if fileExt.lower()=="wav":
+    #     return audioBytes
+        
+    # with wave.open(abs_path_file, 'wb') as wav_file:
+    #     wav_file.setnchannels(1) # Mono audio
+    #     wav_file.setframerate(16000)
+    #     wav_file.setsampwidth(2)# 16-bit audio
+    #     wav_file.writeframes(audioBytes)
+    uinqueId=f"{datetime.datetime.now().timestamp()}.{uuid.uuid4()}"
+    pathInputFile=f"{____workingDir}/static/{uinqueId}.{fileNameInput}"
+  
+    with open(pathInputFile, 'wb') as f:
+        f.write(audioBytes)
+        
+    wavAbsPathFile= f"{____workingDir}/static/{uinqueId}.{fileNameInput}.wav"
+    # convert mp3 to wav file
+    subprocess.call(['ffmpeg','-y', '-i', pathInputFile,'-ac','2', wavAbsPathFile])
+    
+    temp=open(wavAbsPathFile, "rb").read()
+    
+    print(f"Converted into: {wavAbsPathFile}")    
+    
+    os.remove(pathInputFile)
+    os.remove(wavAbsPathFile)
+    return temp
 
 def extractEmotionFromAudioFile(file_name: str):
 
     (sample_rate, samples) = scipy.io.wavfile.read(file_name)
+    
+    print(f"extractEmotionFromAudioFile rate: {sample_rate}")
 
     return extractEmotionFromAudioNdarray(sample_rate, samples)
 
 def extractEmotionFromAudioBytes(audioBytes):
 
     (sample_rate, samples) = scipy.io.wavfile.read(io.BytesIO(audioBytes))
+    
+    #mono_data = numpy.mean(samples, axis=1, dtype=numpy.int16)
+    
+    print(f"extractEmotionFromAudioBytes rate: {sample_rate}")
 
     return extractEmotionFromAudioNdarray(sample_rate, samples)
 
@@ -151,6 +192,51 @@ def extractEmotionFromAudioNdarray(sample_rate: int, samplesNdarray):
 
 webApp = FastAPI()
 
+reusable_oauth2 = HTTPBearer(
+    scheme_name='Authorization'
+)
+
+# # @webApp.middleware("http")
+# # async def jwt_middleware_authenticate(request: Request, call_next):
+# #     #start_time = time.time() Bearer
+# #     authToken=None
+
+# #     #https://jwcrypto.readthedocs.io/en/latest/
+
+# #     if  "authorization" in request.headers:
+# #         authToken= request.headers["authorization"].strip()
+# #     elif "Authorization" in request.headers:
+# #         authToken= request.headers["Authorization"].strip()
+
+# #     if authToken==None or authToken=="":
+# #         #raise HTTPException(status_code=401, detail="Unauthenticate")
+# #         return Response("Unauthenticate", status_code=401)
+
+# #     if authToken.startswith("Bearer") or authToken.startswith("bearer"):
+# #         authToken=authToken[6:].strip()
+
+# #     k = {"k": APP_KEY, "kty": "oct"}
+# #     key = jwk.JWK(**k)
+
+# #     jwt.JWT(key=key, jwt=authToken)
+
+# #     payload =  jwt.JWT(key=key, jwt=authToken)
+
+# #     if datetime.datetime(payload.get('exp')) < datetime.datetime.now():
+# #         raise Response( "Token expired",status_code=403)
+
+# #     request.state.jwt=payload
+# #     response = await call_next(request)
+# #     # process_time = time.time() - start_time
+# #     # response.headers["X-Process-Time"] = str(process_time)
+# #     return response
+
+# #@webApp.get("/apis/auth/test",dependencies=[Depends(jwt_validate_token)])
+# @webApp.get("/apis/auth/test")
+# async def TestAuth():
+
+#     return Request.state.jwt
+
 folder_static = f"{____workingDir}/static"
 isExist_static = os.path.exists(folder_static)
 if not isExist_static:
@@ -176,6 +262,9 @@ async def root():
 @webApp.post("/apis/audio/detect/emotion")
 async def audioDetectEmotion(file: UploadFile = File(...)):
     speechBytes = await file.read()
+    
+    speechBytes= convertToWavFromBytes(speechBytes,file.filename)
+    
     # audio_file_object = io.BytesIO()
     # sampleRate = 16000
     # with wave.open(audio_file_object, 'wb') as mem_file:
@@ -201,10 +290,9 @@ def runUvicorn(port):
 
 # file_name = f"{____workingDir}/E_anhbd6_D_2023-01-04_H_085448_331_CLID_0971129816_210_21_NO.wav"
 # file_name = f"{____workingDir}/2023-01-11-2022-0338954101-14.41.mp3"
-# file_name = f"{____workingDir}/oh-yeah-everything-is-fine.wav"
+file_name = f"{____workingDir}/oh-yeah-everything-is-fine.wav"
 
-# extractEmotionFromAudioFile(file_name)
+extractEmotionFromAudioFile(file_name)
 
-if __name__ == "__main__":
-    # _port=9981
-    runUvicorn(9991)
+if __name__ == "__main__":    
+    runUvicorn(_http_port)
