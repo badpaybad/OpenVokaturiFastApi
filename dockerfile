@@ -16,4 +16,13 @@ RUN apt-get -y clean
 
 COPY / /app
 
-CMD [ "python3", "programa.py","9998"]
+RUN wget https://vokaturi.com/doc/OpenVokaturi-4-0.zip
+RUN unzip OpenVokaturi-4-0.zip -d "OpenVokaturi-4-0"
+
+EXPOSE 9998
+
+CMD [ "python3", "program.py","9998"]
+
+#docker build -f dockerfile -t vocal-emotion-detector .
+
+#docker run -d --restart always -p 9998:9998 --name vocal-emotion-detector_9998 vocal-emotion-detector
