@@ -9,20 +9,23 @@ RUN apt-get -y install libv4l-dev libtheora-dev libvorbis-dev libxvidcore-dev li
 RUN apt-get -y install x264 libtesseract-dev libgdiplus libc6-dev libc6-dev && apt-get -y clean && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install -U fastapi uvicorn imutils python-multipart pydantic easydict jwcrypto unidecode requests
-RUN pip3 install -U pyaudio wave scipy pyopenssl sklearn
+RUN pip3 install -U wave scipy pyopenssl scikit-learn
 RUN pip3 install -U pymongo redis unidecode pyinstaller ffmpeg gdown 
-
+RUN apt-get update && apt-get -y install ffmpeg
 RUN apt-get -y clean
 
 COPY / /app
 
-RUN wget https://vokaturi.com/doc/OpenVokaturi-4-0.zip
-RUN unzip OpenVokaturi-4-0.zip -d "OpenVokaturi-4-0"
+#RUN wget https://vokaturi.com/doc/OpenVokaturi-4-0.zip
 
-EXPOSE 9998
+RUN unzip -o OpenVokaturi-4-0.zip -d OpenVokaturi-4-0
+#RUN sh -c 'unzip -q OpenVokaturi-4-0.zip -d OpenVokaturi-4-0'
 
-CMD [ "python3", "program.py","9998"]
+
+EXPOSE 9988
+
+CMD [ "python3", "program.py","9988"]
 
 #docker build -f dockerfile -t vocal-emotion-detector .
 
-#docker run -d --restart always -p 9998:9998 --name vocal-emotion-detector_9998 vocal-emotion-detector
+#docker run -d --restart always -p 9988:9988 --name vocal-emotion-detector_9988 vocal-emotion-detector
