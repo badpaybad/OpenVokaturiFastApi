@@ -58,8 +58,6 @@ print("____workingDir", ____workingDir)
 #    Angry: 0.001
 #    Fear: 0.000
 
-
-# pip3 install --upgrade requests
 sys.path.append(os.path.abspath(f"{____workingDir}/OpenVokaturi-4-0"))
 sys.path.append(os.path.abspath(
     f"{____workingDir}/OpenVokaturi-4-0/OpenVokaturi-4-0/"))
@@ -110,10 +108,12 @@ def convertToWavFromBytes(audioBytes, fileNameInput:str):
         f.write(audioBytes)
         
     wavAbsPathFile= f"{____workingDir}/static/{uinqueId}.{fileNameInput}.wav"
-    # convert mp3 to wav file
+    # convert mp3 to wav file, all to wav as stereo
     subprocess.call(['ffmpeg','-y', '-i', pathInputFile,'-ac','2', wavAbsPathFile])
     
-    temp=open(wavAbsPathFile, "rb").read()
+    temp=[]
+    with open(wavAbsPathFile, "rb") as fr:
+        temp=fr.read()
     
     print(f"Converted into: {wavAbsPathFile}")    
     
