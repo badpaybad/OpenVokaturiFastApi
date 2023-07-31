@@ -1,0 +1,10 @@
+{
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#0C2E54",
+        "titleBar.activeBackground": "#114175",
+        "titleBar.activeForeground": "#F7FAFE"
+    },
+    "python.analysis.extraPaths": [
+        "./OpenVokaturi-4-0/OpenVokaturi-4-0/api"
+    ]
+}
