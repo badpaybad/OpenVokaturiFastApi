@@ -5,12 +5,13 @@ import wave
 import numpy
 from pydantic import ValidationError
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer,OAuth2PasswordBearer
 from fastapi import Depends, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, File, Form, UploadFile, Request, Response
+
 import uvicorn
 from jwcrypto import jwt, jwk
 import struct
@@ -28,6 +29,8 @@ import sys
 import scipy.io.wavfile
 
 
+SECURITY_ALGORITHM = 'HS256'
+APP_KEY = '21128403-1e4e-4caf-ba37-8a8a0b211302'
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 _http_port = str(sys.argv[1])
@@ -87,15 +90,18 @@ print("Analyzed by: %s" % Vokaturi.versionAndLicense())
 
 import uuid
 import subprocess
-def convertToWavFromBytes(audioBytes, fileNameInput:str):
+def convertToWavFromBytes(audioBytes, fileNameInput:str, sourceChannel:int=0):
     
     fileExt=fileNameInput.split(".")[-1]+""
     
     print(f"fileExt: {fileExt} fileNameInput: {fileNameInput}")
-    
-    # if fileExt.lower()=="wav":
-    #     return audioBytes
-        
+    ac=2
+    if fileExt.lower()=="wav":
+        if sourceChannel <= 0:
+            return audioBytes
+        else:
+            ac = sourceChannel
+            
     # with wave.open(abs_path_file, 'wb') as wav_file:
     #     wav_file.setnchannels(1) # Mono audio
     #     wav_file.setframerate(16000)
@@ -109,7 +115,7 @@ def convertToWavFromBytes(audioBytes, fileNameInput:str):
         
     wavAbsPathFile= f"{____workingDir}/static/{uinqueId}.{fileNameInput}.wav"
     # convert mp3 to wav file, all to wav as stereo
-    subprocess.call(['ffmpeg','-y', '-i', pathInputFile,'-ac','2', wavAbsPathFile])
+    subprocess.call(['ffmpeg','-y', '-i', pathInputFile,'-ac',f'{ac}', wavAbsPathFile])
     
     temp=[]
     with open(wavAbsPathFile, "rb") as fr:
@@ -138,7 +144,6 @@ def extractEmotionFromAudioBytes(audioBytes):
     print(f"extractEmotionFromAudioBytes rate: {sample_rate}")
 
     return extractEmotionFromAudioNdarray(sample_rate, samples)
-
 
 def extractEmotionFromAudioNdarray(sample_rate: float, samplesNdarray):
 
@@ -285,46 +290,70 @@ reusable_oauth2 = HTTPBearer(
     scheme_name='Authorization'
 )
 
-# # @webApp.middleware("http")
-# # async def jwt_middleware_authenticate(request: Request, call_next):
-# #     #start_time = time.time() Bearer
-# #     authToken=None
+#oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# #     #https://jwcrypto.readthedocs.io/en/latest/
+# @webApp.middleware("http")
+# async def jwt_middleware_authenticate(request: Request, call_next):
+#     #start_time = time.time() Bearer
+#     authToken=None
 
-# #     if  "authorization" in request.headers:
-# #         authToken= request.headers["authorization"].strip()
-# #     elif "Authorization" in request.headers:
-# #         authToken= request.headers["Authorization"].strip()
+#     #https://jwcrypto.readthedocs.io/en/latest/
 
-# #     if authToken==None or authToken=="":
-# #         #raise HTTPException(status_code=401, detail="Unauthenticate")
-# #         return Response("Unauthenticate", status_code=401)
+#     if  "authorization" in request.headers:
+#         authToken= request.headers["authorization"].strip()
+#     elif "Authorization" in request.headers:
+#         authToken= request.headers["Authorization"].strip()
 
-# #     if authToken.startswith("Bearer") or authToken.startswith("bearer"):
-# #         authToken=authToken[6:].strip()
+#     if authToken==None or authToken=="":
+#         #raise HTTPException(status_code=401, detail="Unauthenticate")
+#         return Response("Unauthenticate", status_code=401)
 
-# #     k = {"k": APP_KEY, "kty": "oct"}
-# #     key = jwk.JWK(**k)
+#     if authToken.startswith("Bearer") or authToken.startswith("bearer"):
+#         authToken=authToken[6:].strip()
 
-# #     jwt.JWT(key=key, jwt=authToken)
+#     k = {"k": APP_KEY, "kty": "oct"}
+#     key = jwk.JWK(**k)
 
-# #     payload =  jwt.JWT(key=key, jwt=authToken)
+#     jwt.JWT(key=key, jwt=authToken)
 
-# #     if datetime.datetime(payload.get('exp')) < datetime.datetime.now():
-# #         raise Response( "Token expired",status_code=403)
+#     payload =  jwt.JWT(key=key, jwt=authToken)
 
-# #     request.state.jwt=payload
-# #     response = await call_next(request)
-# #     # process_time = time.time() - start_time
-# #     # response.headers["X-Process-Time"] = str(process_time)
-# #     return response
+#     if datetime.datetime(payload.get('exp')) < datetime.datetime.now():
+#         raise Response( "Token expired",status_code=403)
 
-# #@webApp.get("/apis/auth/test",dependencies=[Depends(jwt_validate_token)])
-# @webApp.get("/apis/auth/test")
-# async def TestAuth():
+#     request.state.jwt=payload #send token 
+#     response = await call_next(request)
+#     # process_time = time.time() - start_time
+#     # response.headers["X-Process-Time"] = str(process_time)
+#     return response
+from typing_extensions import Annotated
+async def jwt_validate(request: Request,token= Depends(reusable_oauth2)):
+    authToken=None
+    
+    if  "authorization" in request.headers:
+        authToken= request.headers["authorization"].strip()
+    elif "Authorization" in request.headers:
+        authToken= request.headers["Authorization"].strip()
 
-#     return Request.state.jwt
+    if authToken==None or authToken=="":
+        raise HTTPException(status_code=401, detail="Unauthenticate")
+        
+    if authToken.startswith("Bearer") or authToken.startswith("bearer"):
+        authToken=authToken[6:].strip()
+        
+    print(f"authToken: {authToken}")
+        
+    k = {"k": APP_KEY, "kty": "oct"}
+    key = jwk.JWK(**k)    
+    payload =  jwt.JWT(key=key, jwt=authToken)
+    request.state.jwt=payload #send token 
+    pass
+
+@webApp.get("/apis/auth/test",dependencies=[Depends(jwt_validate)])
+##@webApp.get("/apis/auth/test")
+async def TestAuth(request:Request):
+
+    return request.state.jwt
 
 folder_static = f"{____workingDir}/static"
 isExist_static = os.path.exists(folder_static)
@@ -349,11 +378,11 @@ async def root():
 
 
 @webApp.post("/apis/audio/detect/emotion")
-async def audioDetectEmotion(file: UploadFile = File(...), stepInSeconds:Optional[int]=2):
+async def audioDetectEmotion(file: UploadFile = File(...),audioChannel:Optional[int]=2, stepInSeconds:Optional[int]=2):
     try:
         speechBytes = await file.read()
         
-        speechBytes= convertToWavFromBytes(speechBytes,file.filename)
+        speechBytes= convertToWavFromBytes(speechBytes,file.filename,audioChannel)
         
         # audio_file_object = io.BytesIO()
         # sampleRate = 16000
