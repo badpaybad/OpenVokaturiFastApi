@@ -378,11 +378,12 @@ async def root():
 
 
 @webApp.post("/apis/audio/detect/emotion")
-async def audioDetectEmotion(file: UploadFile = File(...),audioChannel:Optional[int]=2, stepInSeconds:Optional[int]=2):
+async def audioDetectEmotion(file: UploadFile = File(...),convertToAudioChannel:int=Form(2), stepInSeconds:int=Form(2)):
+#async def audioDetectEmotion(file: UploadFile = File(...),audioChannel:Optional[int]=2, stepInSeconds:Optional[int]=2):
     try:
         speechBytes = await file.read()
         
-        speechBytes= convertToWavFromBytes(speechBytes,file.filename,audioChannel)
+        speechBytes= convertToWavFromBytes(speechBytes,file.filename,convertToAudioChannel)
         
         # audio_file_object = io.BytesIO()
         # sampleRate = 16000
