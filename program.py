@@ -172,14 +172,6 @@ def extractEmotionFromAudioNdarray(sample_rate: float, samplesNdarray):
     emotionProbabilities = Vokaturi.EmotionProbabilities()
     voice.extract(quality, emotionProbabilities)
 
-    temp = {
-        "neutral": None,
-        "happy": None,
-        "sad": None,
-        "angry": None,
-        "fear": None
-    }
-
     if quality.valid:
         # print("Neutral: %.3f" % emotionProbabilities.neutrality)
         # print("Happy: %.3f" % emotionProbabilities.happiness)
@@ -196,6 +188,14 @@ def extractEmotionFromAudioNdarray(sample_rate: float, samplesNdarray):
         }
     else:
         print("Not enough sonorancy to determine emotions")
+        temp = {
+        "neutral": None,
+        "happy": None,
+        "sad": None,
+        "angry": None,
+        "fear": None,
+        "msg":"Not enough sonorancy to determine emotions"
+    }
 
     voice.destroy()
 
@@ -250,16 +250,11 @@ def extractEmotionFromAudioNdarrayInterval(sample_rate: float, samplesNdarray, t
         voice.fill_float64array( int(endSample-startingSample)   , c_buffer)
         
         quality = Vokaturi.Quality()
+        
         emotionProbabilities = Vokaturi.EmotionProbabilities()
         voice.extract(quality, emotionProbabilities)
-        temp = {
-                "neutral": None,
-                "happy": None,
-                "sad": None,
-                "angry": None,
-                "fear": None
-            }
-
+      
+      
         if quality.valid:
             # print("Neutral: %.3f" % emotionProbabilities.neutrality)
             # print("Happy: %.3f" % emotionProbabilities.happiness)
@@ -271,16 +266,25 @@ def extractEmotionFromAudioNdarrayInterval(sample_rate: float, samplesNdarray, t
                 "happy": round(emotionProbabilities.happiness,3),
                 "sad": round(emotionProbabilities.sadness,3),
                 "angry": round( emotionProbabilities.anger,3),
-                "fear": round( emotionProbabilities.fear,3)
+                "fear": round( emotionProbabilities.fear,3),
+                "msg":None
             }
         else:
             print("Not enough sonorancy to determine emotions")
+            temp = {
+                "neutral": None,
+                "happy": None,
+                "sad": None,
+                "angry": None,
+                "fear": None,
+                "msg":"Not enough sonorancy to determine emotions"
+            }            
             
         dicResult.append (
             {
             "startingTime":startingTime,
             "endTime":endTime,
-            "data":temp
+            "data":temp,            
         }
         )
     voice.destroy()
@@ -381,12 +385,14 @@ async def root():
 
 
 @webApp.post("/apis/audio/detect/emotion")
-async def audioDetectEmotion(file: UploadFile = File(...),convertToAudioChannel:int=Form(2), stepInSeconds:int=Form(2)):
+async def audioDetectEmotion(file: UploadFile = File(...),convertToAudioChannel:int=Form(0), stepInSeconds:int=Form(0)):
 #async def audioDetectEmotion(file: UploadFile = File(...),audioChannel:Optional[int]=2, stepInSeconds:Optional[int]=2):
     try:
         speechBytes = await file.read()
         
-        speechBytes= convertToWavFromBytes(speechBytes,file.filename,convertToAudioChannel)
+        fileNameInput= file.filename
+        
+        speechBytes= convertToWavFromBytes(speechBytes,fileNameInput,convertToAudioChannel)
         
         # audio_file_object = io.BytesIO()
         # sampleRate = 16000
@@ -410,14 +416,18 @@ async def audioDetectEmotion(file: UploadFile = File(...),convertToAudioChannel:
         return {
             "ok": 1,
             "full":full,
-            "chunks": chunks
+            "chunks": chunks,
+            "file":fileNameInput,
+            "err":None
         }
     except Exception as ex:
         print(f"audioDetectEmotion#ERR: {ex}")
         return {
             "ok": 0,
             "full":None,
-            "chunks": None
+            "chunks": None,
+            "file":fileNameInput,
+            "err":ex
         }
 
 
