@@ -178,13 +178,13 @@ def extractEmotionFromAudioNdarray(sample_rate: float, samplesNdarray):
         # print("Sad: %.3f" % emotionProbabilities.sadness)
         # print("Angry: %.3f" % emotionProbabilities.anger)
         # print("Fear: %.3f" % emotionProbabilities.fear)
-        temp = {
-           
+        temp = {           
                 "neutral":round ( emotionProbabilities.neutrality,3),
                 "happy": round(emotionProbabilities.happiness,3),
                 "sad": round(emotionProbabilities.sadness,3),
                 "angry": round( emotionProbabilities.anger,3),
-                "fear": round( emotionProbabilities.fear,3)
+                "fear": round( emotionProbabilities.fear,3),
+                "msg":None
         }
     else:
         print("Not enough sonorancy to determine emotions")
