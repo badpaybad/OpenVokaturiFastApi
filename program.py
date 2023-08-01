@@ -101,6 +101,9 @@ def convertToWavFromBytes(audioBytes, fileNameInput:str, sourceChannel:int=0):
             return audioBytes
         else:
             ac = sourceChannel
+    else:
+        if sourceChannel > 0:
+            ac = sourceChannel
             
     # with wave.open(abs_path_file, 'wb') as wav_file:
     #     wav_file.setnchannels(1) # Mono audio
