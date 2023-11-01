@@ -11,9 +11,9 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, File, Form, UploadFile, Request, Response
-
+import hashlib
 import uvicorn
-from jwcrypto import jwt, jwk
+#from jwcrypto import jwt, jwk
 import struct
 import platform
 
@@ -28,10 +28,21 @@ from typing import Optional
 import sys
 import scipy.io.wavfile
 
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from jose import JWTError, jwt 
+
+from typing import Union
+
 
 SECURITY_ALGORITHM = 'HS256'
-APP_KEY = '21128403-1e4e-4caf-ba37-8a8a0b211302'
+APP_KEY =os.getenv("APP_KEY", '211284dd-1e4e-4caf-ba37-8a8a0b211302')
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+#generate key by commandline: openssl rand -hex 32
+SECRET_KEY=os.getenv("SECRET_KEY","09d25e021faa6ca2126c818184b7a9563b93f7099f6f0f02aa13f63bdd841221")
+JWT_KEY_AS_SECRET=os.getenv("JWT_KEY_AS_SECRET","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdGF0aWMiLCJpZCI6IjU5YmFiZjgwZjIwZmZmYjk4NjUxYTNlNDk1OGZiMzg3YzM2NzVmMmQ0NjI2MWE1MjM3YWU4NjEzNjQ5NTk5MzAiLCJleHAiOjQ4NTI0NDY2ODB9.JPrA_K7YFnJ3j9zUHnrBxxmXUW8ARs52PHugab4xlpU")
+
+ACCESS_TOKEN_EXPIRE_MINUTES=60*24*365*100 #100 nam sau 
 
 _http_port = str(sys.argv[1])
 
@@ -40,6 +51,31 @@ ____workingDir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(1, ____workingDir)
 
 print("____workingDir", ____workingDir)
+
+#jwt auth https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/#__tabbed_1_3
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def hash256hex(text):
+    m = hashlib.sha256(text.encode('UTF-8'))
+    return m.hexdigest()
+
+def create_jwt_token(data: dict, expires_delta_timedelta=None):
+    to_encode = data.copy()
+    if expires_delta_timedelta!=None:
+        expire = datetime.utcnow() + expires_delta_timedelta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=SECURITY_ALGORITHM)
+    return encoded_jwt
+
+#print(create_jwt_token({"sub":"static","id":hash256hex(APP_KEY)}))
 
 
 # OpenVokaWavMean.py
@@ -68,6 +104,12 @@ sys.path.append(os.path.abspath(
     f"{____workingDir}/OpenVokaturi-4-0/OpenVokaturi-4-0/api/"))
 import Vokaturi
 
+class AppContext:
+    def __init__(self) :
+        self.apppkeyhashhex=hash256hex(APP_KEY)
+        pass
+    
+appContext=AppContext()
 
 print("Loading library...")
 if platform.system() == "Darwin":
@@ -335,26 +377,34 @@ reusable_oauth2 = HTTPBearer(
 #     return response
 from typing_extensions import Annotated
 async def jwt_validate(request: Request,token= Depends(reusable_oauth2)):
-    authToken=None
-    
-    if  "authorization" in request.headers:
-        authToken= request.headers["authorization"].strip()
-    elif "Authorization" in request.headers:
-        authToken= request.headers["Authorization"].strip()
+#async def jwt_validate(request: Request,token= Depends(oauth2_scheme)):
+    try:
+        authToken=""
+        print(f"token: {token}")
+        
+        if  "authorization" in request.headers:
+            authToken= request.headers["authorization"].strip()
+        elif "Authorization" in request.headers:
+            authToken= request.headers["Authorization"].strip()
 
-    if authToken==None or authToken=="":
+        if authToken==None or authToken=="":
+            raise HTTPException(status_code=401, detail="Unauthenticate")
+            
+        if authToken.startswith("Bearer") or authToken.startswith("bearer"):
+            authToken=authToken[6:].strip()
+                
+        payload = jwt.decode(authToken, SECRET_KEY, algorithms=[SECURITY_ALGORITHM])
+        
+        appkey_hashed_claim = payload.get("id")
+            
+        if(appkey_hashed_claim!=appContext.apppkeyhashhex):
+            raise HTTPException(status_code=401, detail="Unauthenticate")
+        
+        request.state.jwt=payload #send token 
+    except Exception as ex:
+        print(ex)
         raise HTTPException(status_code=401, detail="Unauthenticate")
-        
-    if authToken.startswith("Bearer") or authToken.startswith("bearer"):
-        authToken=authToken[6:].strip()
-        
-    print(f"authToken: {authToken}")
-        
-    k = {"k": APP_KEY, "kty": "oct"}
-    key = jwk.JWK(**k)    
-    payload =  jwt.JWT(key=key, jwt=authToken)
-    request.state.jwt=payload #send token 
-    pass
+        pass
 
 @webApp.get("/apis/auth/test",dependencies=[Depends(jwt_validate)])
 ##@webApp.get("/apis/auth/test")
@@ -384,7 +434,7 @@ async def root():
     return "swagger API docs: /docs"
 
 
-@webApp.post("/apis/audio/detect/emotion")
+@webApp.post("/apis/audio/detect/emotion",dependencies=[Depends(jwt_validate)])
 async def audioDetectEmotion(file: UploadFile = File(...),convertToAudioChannel:int=Form(0), stepInSeconds:int=Form(0)):
 #async def audioDetectEmotion(file: UploadFile = File(...),audioChannel:Optional[int]=2, stepInSeconds:Optional[int]=2):
     try:

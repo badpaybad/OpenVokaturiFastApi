@@ -13,6 +13,7 @@ RUN pip3 install -U wave scipy pyopenssl scikit-learn
 RUN pip3 install -U pymongo redis unidecode pyinstaller ffmpeg gdown 
 RUN apt-get update && apt-get -y install ffmpeg
 RUN apt-get -y clean
+RUN pip3 install "python-jose[cryptography]" "passlib[bcrypt]"
 
 COPY / /app
 
