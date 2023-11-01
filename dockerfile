@@ -28,5 +28,5 @@ EXPOSE 9988
 CMD [ "python3", "program.py","9988"]
 
 #docker build -f dockerfile -t vocal-emotion-detector .
-
+#docker rm --force vocal-emotion-detector_9988
 #docker run -d --restart always -p 9988:9988 --name vocal-emotion-detector_9988 vocal-emotion-detector
