@@ -86,16 +86,11 @@ def create_jwt_token(data: dict, expires_delta_timedelta=None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    to_encode.update({"iss": hash256hex(APP_KEY+SECRET_KEY)})
+    #to_encode.update({"iss": hash256hex(APP_KEY+SECRET_KEY)})
     
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=SECURITY_ALGORITHM)
     return encoded_jwt
 
-if _use_jwt_as_secret_generate==1:
-    print("JWT_KEY_AS_SECRET")
-    print(create_jwt_token({"sub":"static","id":hash256hex(APP_KEY)}))
-    exit(0)
-    
 
 # OpenVokaWavMean.py
 # public-domain sample code by Vokaturi, 2022-08-25
@@ -126,9 +121,43 @@ import Vokaturi
 class AppContext:
     def __init__(self) :
         self.apppkeyhashhex=hash256hex(APP_KEY)
+        self.isshashhex=hash256hex(APP_KEY+SECRET_KEY)
         pass
+    def create_jwt_token(self):
+        return create_jwt_token({"sub":"static","id":self.apppkeyhashhex,"iss":  self.isshashhex})
+    
+    def verify_jwt_token(self,authToken):
+        
+        payload = jwt.decode(authToken, SECRET_KEY, algorithms=[SECURITY_ALGORITHM], options={"verify_signature": True})
+        
+        appkey_hashed_claim = payload.get("id")
+        
+        iss_hashed_claim = payload.get("iss")
+        
+        #self.isshashhex
+            
+        if(appkey_hashed_claim!=self.apppkeyhashhex):
+            return None
+        
+        return payload
+    
+    def verify_jwt_token_as_secret(self, jwttoken):
+        if JWT_KEY_AS_SECRET==None or JWT_KEY_AS_SECRET=="":
+            return True
+        
+        # print("jwttoken")
+        # print(jwttoken)
+        # print(JWT_KEY_AS_SECRET)
+        
+        return jwttoken == JWT_KEY_AS_SECRET
     
 appContext=AppContext()
+
+if _use_jwt_as_secret_generate==1:
+    print("JWT_KEY_AS_SECRET")
+    print(appContext.create_jwt_token())
+    exit(0)
+    
 
 print("Loading library...")
 if platform.system() == "Darwin":
@@ -412,21 +441,24 @@ async def jwt_validate(request: Request,token= Depends(reusable_oauth2)):
         if authToken.startswith("Bearer") or authToken.startswith("bearer"):
             authToken=authToken[6:].strip()
                 
-        payload = jwt.decode(authToken, SECRET_KEY, algorithms=[SECURITY_ALGORITHM], options={"verify_signature": True})
+        # payload = jwt.decode(authToken, SECRET_KEY, algorithms=[SECURITY_ALGORITHM], options={"verify_signature": True})
         
-        appkey_hashed_claim = payload.get("id")
+        # appkey_hashed_claim = payload.get("id")
         
-        iss_hashed_claim = payload.get("iss")
+        # iss_hashed_claim = payload.get("iss")
         
-        iss_hashhex=hash256hex(APP_KEY+SECRET_KEY)
-            
-        if(appkey_hashed_claim!=appContext.apppkeyhashhex):
-            raise HTTPException(status_code=401, detail="Unauthenticate")
+        #appContext.isshashhex
+        payload=appContext.verify_jwt_token(authToken)
+        if(payload==None):
+            raise Exception("Not jwt token id")
+                
+        if( appContext.verify_jwt_token_as_secret(authToken)==False):
+            raise Exception("Not jwt token secret")
         
         request.state.jwt=payload #send token 
     except Exception as ex:
         print(ex)
-        raise HTTPException(status_code=401, detail="Unauthenticate")
+        raise HTTPException(status_code=401, detail=f"Unauthenticate, subexcpetion: {ex}")
         pass
 
 @webApp.get("/apis/auth/test",dependencies=[Depends(jwt_validate)])
