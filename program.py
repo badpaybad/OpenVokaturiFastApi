@@ -30,7 +30,8 @@ import scipy.io.wavfile
 
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-from jose import JWTError, jwt 
+import jose
+from jose import JWTError, jwt ,jws
 
 from typing import Union
 
@@ -78,12 +79,15 @@ def hash256hex(text):
     return m.hexdigest()
 
 def create_jwt_token(data: dict, expires_delta_timedelta=None):
+    #jwsigned = jws.sign(claims, SECRET_KEY, alg=SECURITY_ALGORITHM)
     to_encode = data.copy()
     if expires_delta_timedelta!=None:
         expire = datetime.utcnow() + expires_delta_timedelta
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
+    to_encode.update({"iss": hash256hex(APP_KEY+SECRET_KEY)})
+    
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=SECURITY_ALGORITHM)
     return encoded_jwt
 
@@ -408,9 +412,13 @@ async def jwt_validate(request: Request,token= Depends(reusable_oauth2)):
         if authToken.startswith("Bearer") or authToken.startswith("bearer"):
             authToken=authToken[6:].strip()
                 
-        payload = jwt.decode(authToken, SECRET_KEY, algorithms=[SECURITY_ALGORITHM])
+        payload = jwt.decode(authToken, SECRET_KEY, algorithms=[SECURITY_ALGORITHM], options={"verify_signature": True})
         
         appkey_hashed_claim = payload.get("id")
+        
+        iss_hashed_claim = payload.get("iss")
+        
+        iss_hashhex=hash256hex(APP_KEY+SECRET_KEY)
             
         if(appkey_hashed_claim!=appContext.apppkeyhashhex):
             raise HTTPException(status_code=401, detail="Unauthenticate")
