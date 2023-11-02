@@ -1,5 +1,7 @@
 FROM python:3.8-buster
-
+ENV APP_KEY=""
+ENV SECRET_KEY=""
+ENV JWT_KEY_AS_SECRET=""
 WORKDIR /app
 
 RUN apt-get update && apt-get -y install --no-install-recommends git nano apt-transport-https software-properties-common \

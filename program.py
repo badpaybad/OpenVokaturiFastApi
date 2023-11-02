@@ -37,14 +37,26 @@ from typing import Union
 
 SECURITY_ALGORITHM = 'HS256'
 APP_KEY =os.getenv("APP_KEY", '211284dd-1e4e-4caf-ba37-8a8a0b211302')
+if APP_KEY==None or APP_KEY=="":
+    APP_KEY="211284dd-1e4e-4caf-ba37-8a8a0b211302"
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 #generate key by commandline: openssl rand -hex 32
 SECRET_KEY=os.getenv("SECRET_KEY","09d25e021faa6ca2126c818184b7a9563b93f7099f6f0f02aa13f63bdd841221")
+if SECRET_KEY==None or SECRET_KEY=="":
+    SECRET_KEY="09d25e021faa6ca2126c818184b7a9563b93f7099f6f0f02aa13f63bdd841221"
 JWT_KEY_AS_SECRET=os.getenv("JWT_KEY_AS_SECRET","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdGF0aWMiLCJpZCI6IjU5YmFiZjgwZjIwZmZmYjk4NjUxYTNlNDk1OGZiMzg3YzM2NzVmMmQ0NjI2MWE1MjM3YWU4NjEzNjQ5NTk5MzAiLCJleHAiOjQ4NTI0NDY2ODB9.JPrA_K7YFnJ3j9zUHnrBxxmXUW8ARs52PHugab4xlpU")
-
+if JWT_KEY_AS_SECRET==None or JWT_KEY_AS_SECRET=="":
+    JWT_KEY_AS_SECRET="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdGF0aWMiLCJpZCI6IjU5YmFiZjgwZjIwZmZmYjk4NjUxYTNlNDk1OGZiMzg3YzM2NzVmMmQ0NjI2MWE1MjM3YWU4NjEzNjQ5NTk5MzAiLCJleHAiOjQ4NTI0NDY2ODB9.JPrA_K7YFnJ3j9zUHnrBxxmXUW8ARs52PHugab4xlpU"
 ACCESS_TOKEN_EXPIRE_MINUTES=60*24*365*100 #100 nam sau 
 
+print("APP_KEY")
+print(APP_KEY)
+
 _http_port = str(sys.argv[1])
+
+_use_jwt_as_secret_generate=0
+if _http_port=="jwt":
+    _use_jwt_as_secret_generate=1
 
 # insert at 1, 0 is the script path (or '' in REPL)
 ____workingDir = os.path.dirname(os.path.realpath(__file__))
@@ -75,8 +87,11 @@ def create_jwt_token(data: dict, expires_delta_timedelta=None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=SECURITY_ALGORITHM)
     return encoded_jwt
 
-#print(create_jwt_token({"sub":"static","id":hash256hex(APP_KEY)}))
-
+if _use_jwt_as_secret_generate==1:
+    print("JWT_KEY_AS_SECRET")
+    print(create_jwt_token({"sub":"static","id":hash256hex(APP_KEY)}))
+    exit(0)
+    
 
 # OpenVokaWavMean.py
 # public-domain sample code by Vokaturi, 2022-08-25

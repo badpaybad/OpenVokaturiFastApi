@@ -16,8 +16,13 @@ extract to folder eg:
 
                 python3 program.py 9988
 
+# Run to generate jwt_as secret 
+
+                python3 program.py jwt
+
 # Docker 
 
+Can use env for docker: APP_KEY , SECRET_KEY, JWT_KEY_AS_SECRET
 
                 docker build -f dockerfile -t vocal-emotion-detector .
 
