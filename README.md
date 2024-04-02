@@ -3,8 +3,8 @@
 download from
 
                 https://vokaturi.com/downloads/download-the-sdk
-
-
+                /OpenVokaturi-4-0.zip
+                
 extract to folder eg:
 
                 /program.py
